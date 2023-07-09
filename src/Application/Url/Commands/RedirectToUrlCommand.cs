@@ -1,6 +1,8 @@
-using FluentValidation;
+﻿using FluentValidation;
 using HashidsNet;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
+using UrlShortenerService.Application.Common.Exceptions;
 using UrlShortenerService.Application.Common.Interfaces;
 
 namespace UrlShortenerService.Application.Url.Commands;
@@ -33,7 +35,14 @@ public class RedirectToUrlCommandHandler : IRequestHandler<RedirectToUrlCommand,
 
     public async Task<string> Handle(RedirectToUrlCommand request, CancellationToken cancellationToken)
     {
-        await Task.CompletedTask;
-        throw new NotImplementedException();
+        var urlLocationInDatabase = _hashids.DecodeLong(request.Id).FirstOrDefault();
+
+        var url = await _context.Urls.FirstOrDefaultAsync(x => x.Id == urlLocationInDatabase, cancellationToken);
+        if (url == null)
+        {
+            throw new NotFoundException($"Requested URL '{KnownPaths.ApplicationUrlHttps}/u/{request.Id}' could not be redirected because ID '{request.Id}' is unknown.");
+        }
+
+        return url.OriginalUrl;
     }
 }

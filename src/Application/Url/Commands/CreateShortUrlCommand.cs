@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 using HashidsNet;
 using MediatR;
 using UrlShortenerService.Application.Common.Interfaces;
@@ -33,7 +33,25 @@ public class CreateShortUrlCommandHandler : IRequestHandler<CreateShortUrlComman
 
     public async Task<string> Handle(CreateShortUrlCommand request, CancellationToken cancellationToken)
     {
-        await Task.CompletedTask;
-        throw new NotImplementedException();
+        var originalUrl = request.Url;
+
+        if (!Uri.IsWellFormedUriString(originalUrl, UriKind.Absolute))
+        {
+            throw new ArgumentException($"Requested URL '{originalUrl}' is not valid.");
+        }
+
+        var urlInDatabase = _context.Urls.FirstOrDefault(x => x.OriginalUrl == originalUrl);
+        if (urlInDatabase == null)
+        {
+            urlInDatabase = new Domain.Entities.Url { OriginalUrl = originalUrl };
+            _ = _context.Urls.Add(urlInDatabase);
+            _ = await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        var urlRedirectionId = _hashids.EncodeLong(urlInDatabase.Id);
+
+        var shortUrl = $"{KnownPaths.ApplicationUrlHttps}/u/{urlRedirectionId}";
+
+        return shortUrl;
     }
 }
